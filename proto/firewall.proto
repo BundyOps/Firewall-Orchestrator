@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package firewall;
+
+// ---------- Enums ----------
+enum Action {
+  ACTION_UNSPECIFIED = 0;
+  ACCEPT = 1;
+  DROP   = 2;
+  REJECT = 3;
+}
+
+enum Protocol {
+  PROTOCOL_UNSPECIFIED = 0;
+  TCP  = 1;
+  UDP  = 2;
+  ICMP = 3;
+  ALL  = 4;
+}
+
+enum Chain {
+  CHAIN_UNSPECIFIED = 0;
+  INPUT   = 1;
+  OUTPUT  = 2;
+  FORWARD = 3;
+}
+
+// ---------- Messages ----------
+message Rule {
+  string   id          = 1;              // server-assigned UUID
+  Chain    chain       = 2;
+  Protocol protocol    = 3;
+  string   source      = 4;              // CIDR or empty for "any"
+  string   destination = 5;              // CIDR or empty for "any"
+  uint32   port        = 6;              // 0 == any port
+  Action   action      = 7;
+  string   comment     = 8;              // human label
+}
+
+message AddRuleRequest    { Rule rule = 1; }
+message AddRuleResponse   { Rule rule = 1; }
+
+message RemoveRuleRequest { string id = 1; }
+message RemoveRuleResponse { bool removed = 1; }
+
+message ListRulesRequest  { Chain chain = 1; /* 0 = all chains */ }
+message ListRulesResponse { repeated Rule rules = 1; }
+
+// ---------- Rate limiting ----------
+message RateLimitRequest {
+  string   target      = 1;   // "10.0.0.5" or "192.168.0.0/24"
+  uint32   rate        = 2;   // e.g. 100
+  string   unit        = 3;   // "second" | "minute" | "hour"
+  Action   action      = 4;   // action when limit exceeded (DROP/REJECT)
+  Chain    chain       = 5;   // where to insert the rule
+  Protocol protocol    = 6;
+  uint32   port        = 7;   // 0 = any
+  string   comment     = 8;
+}
+
+message RateLimitResponse { Rule rule = 1; }
+
+// ---------- Streaming ----------
+message WatchRequest { Chain chain = 1; }
+message WatchEvent {
+  enum Type { ADDED = 0; REMOVED = 1; }
+  Type type = 1;
+  Rule rule = 2;
+}
+
+// ---------- Service ----------
+service FirewallService {
+  // CRUD
+  rpc AddRule    (AddRuleRequest)    returns (AddRuleResponse);
+  rpc RemoveRule (RemoveRuleRequest) returns (RemoveRuleResponse);
+  rpc ListRules  (ListRulesRequest)  returns (ListRulesResponse);
+
+  // Rate limiting
+  rpc ApplyRateLimit (RateLimitRequest) returns (RateLimitResponse);
+
+  // Live updates (optional but nice)
+  rpc WatchRules (WatchRequest) returns (stream WatchEvent);
+}
