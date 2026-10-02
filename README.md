@@ -9,3 +9,5 @@ no design pattern yet!!!!!!!!!!!
 or just for test do:   python3 -m server.firewall_server --dry-run
 
 then:                   python -m client.firewall_client
+
+Watch live events with grpcurl: grpcurl -plaintext -d '{}' localhost:50051 firewall.FirewallService/WatchRules
